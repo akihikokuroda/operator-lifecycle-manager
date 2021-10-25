@@ -7,6 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8slabels "k8s.io/apimachinery/pkg/labels"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 
 	"github.com/operator-framework/api/pkg/operators/v1alpha1"
@@ -78,6 +79,11 @@ func RBACForClusterServiceVersion(csv *v1alpha1.ClusterServiceVersion) (map[stri
 		return nil, fmt.Errorf("could not assert strategy implementation as deployment for CSV %s", csv.GetName())
 	}
 
+//	testLabels := k8slabels.Set {
+//		   "LABEL": "VALUE",
+//		   "LABEL1": "VALUE1",
+//	} 
+	testLabels := k8slabels.Set {} 
 	// Resolve Permissions
 	for _, permission := range strategyDetailsDeployment.Permissions {
 		// Create ServiceAccount if necessary
@@ -96,7 +102,7 @@ func RBACForClusterServiceVersion(csv *v1alpha1.ClusterServiceVersion) (map[stri
 				Name:            generateName(fmt.Sprintf("%s-%s", csv.GetName(), permission.ServiceAccountName), []interface{}{csv.GetName(), permission}),
 				Namespace:       csv.GetNamespace(),
 				OwnerReferences: []metav1.OwnerReference{ownerutil.NonBlockingOwner(csv)},
-				Labels:          ownerutil.OwnerLabel(csv, v1alpha1.ClusterServiceVersionKind),
+				Labels:          k8slabels.Merge(ownerutil.OwnerLabel(csv, v1alpha1.ClusterServiceVersionKind), testLabels),
 			},
 			Rules: permission.Rules,
 		}
@@ -108,7 +114,7 @@ func RBACForClusterServiceVersion(csv *v1alpha1.ClusterServiceVersion) (map[stri
 				Name:            role.GetName(),
 				Namespace:       csv.GetNamespace(),
 				OwnerReferences: []metav1.OwnerReference{ownerutil.NonBlockingOwner(csv)},
-				Labels:          ownerutil.OwnerLabel(csv, v1alpha1.ClusterServiceVersionKind),
+				Labels:          k8slabels.Merge(ownerutil.OwnerLabel(csv, v1alpha1.ClusterServiceVersionKind),  testLabels),
 			},
 			RoleRef: rbacv1.RoleRef{
 				Kind:     "Role",
@@ -138,7 +144,7 @@ func RBACForClusterServiceVersion(csv *v1alpha1.ClusterServiceVersion) (map[stri
 		role := &rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   generateName(csv.GetName(), []interface{}{csv.GetName(), csv.GetNamespace(), permission}),
-				Labels: ownerutil.OwnerLabel(csv, v1alpha1.ClusterServiceVersionKind),
+				Labels: k8slabels.Merge(ownerutil.OwnerLabel(csv, v1alpha1.ClusterServiceVersionKind), testLabels),
 			},
 			Rules: permission.Rules,
 		}
@@ -149,7 +155,7 @@ func RBACForClusterServiceVersion(csv *v1alpha1.ClusterServiceVersion) (map[stri
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      role.GetName(),
 				Namespace: csv.GetNamespace(),
-				Labels:    ownerutil.OwnerLabel(csv, v1alpha1.ClusterServiceVersionKind),
+				Labels:    k8slabels.Merge(ownerutil.OwnerLabel(csv, v1alpha1.ClusterServiceVersionKind), testLabels),
 			},
 			RoleRef: rbacv1.RoleRef{
 				Kind:     "ClusterRole",
