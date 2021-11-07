@@ -6,11 +6,13 @@ import (
 	"strings"
 	"testing"
 	"testing/quick"
+	"fmt"
 
 	"github.com/stretchr/testify/require"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8slabels "k8s.io/apimachinery/pkg/labels"
 
 	"github.com/operator-framework/api/pkg/operators/v1alpha1"
 )
@@ -90,6 +92,7 @@ func TestRBACForClusterServiceVersion(t *testing.T) {
 		name string
 		csv  v1alpha1.ClusterServiceVersion
 		want map[string]*OperatorPermissions
+		label map[string]map[string]string
 	}{
 		{
 			name: "RoleBindings and one ClusterRoleBinding",
@@ -106,6 +109,7 @@ func TestRBACForClusterServiceVersion(t *testing.T) {
 								{
 									ServiceAccountName: serviceAccount1,
 									Rules:              rules,
+									Label:              k8slabels.Set {"LABEL": "VALUE","LABEL1": "VALUE1",},
 								},
 								{
 									ServiceAccountName: serviceAccount1,
@@ -116,6 +120,7 @@ func TestRBACForClusterServiceVersion(t *testing.T) {
 											Resources: []string{"deployments"},
 										},
 									},
+									Label:              k8slabels.Set {"LABEL": "VALUE","LABEL1": "VALUE1",},
 								},
 								{
 									ServiceAccountName: serviceAccount2,
@@ -126,6 +131,7 @@ func TestRBACForClusterServiceVersion(t *testing.T) {
 								{
 									ServiceAccountName: serviceAccount1,
 									Rules:              rules,
+									Label:              k8slabels.Set {"LABEL": "VALUE","LABEL1": "VALUE1",},
 								},
 							},
 						},
@@ -139,6 +145,13 @@ func TestRBACForClusterServiceVersion(t *testing.T) {
 				},
 				serviceAccount2: {
 					RoleBindings: []*rbacv1.RoleBinding{{}},
+				},
+			},
+			label: map[string]map[string]string{
+				serviceAccount1: {
+					"LABEL": "VALUE","LABEL1": "VALUE1",
+				},
+				serviceAccount2: {
 				},
 			},
 		},
@@ -157,6 +170,7 @@ func TestRBACForClusterServiceVersion(t *testing.T) {
 								{
 									ServiceAccountName: serviceAccount1,
 									Rules:              rules,
+									Label:             k8slabels.Set {"LABEL": "VALUE","LABEL1": "VALUE1",},
 								},
 								{
 									ServiceAccountName: serviceAccount2,
@@ -175,6 +189,13 @@ func TestRBACForClusterServiceVersion(t *testing.T) {
 					ClusterRoleBindings: []*rbacv1.ClusterRoleBinding{{}},
 				},
 			},
+			label: map[string]map[string]string{
+				serviceAccount1: {
+					"LABEL": "VALUE","LABEL1": "VALUE1",
+				},
+				serviceAccount2: {
+				},
+			},
 		},
 	}
 
@@ -186,18 +207,28 @@ func TestRBACForClusterServiceVersion(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := RBACForClusterServiceVersion(&tt.csv)
 			require.NoError(t, err)
-
+for sa, pm := range result {
+     fmt.Println("!!!", sa, ", ", pm)
+}
 			roleBindingNames := map[string]bool{}
 			rolesNames := map[string]bool{}
 			for serviceAccount, permissions := range tt.want {
 				// Check that correct number of bindings is created
 				require.Equal(t, len(permissions.RoleBindings), len(result[serviceAccount].RoleBindings))
 				require.Equal(t, len(permissions.ClusterRoleBindings), len(result[serviceAccount].ClusterRoleBindings))
+				labels := tt.label[serviceAccount]
+				fmt.Println("ServiceAccount: ", serviceAccount, ", labels: ", labels) 
 
 				// Check that testing ServiceAccount is the Subject of RoleBindings
 				for _, roleBinding := range result[serviceAccount].RoleBindings {
+				fmt.Println("roleBinding: ",roleBinding) 
 					require.Len(t, roleBinding.Subjects, 1)
 					require.Equal(t, serviceAccount, roleBinding.Subjects[0].Name)
+					for key, value := range labels {
+					fmt.Println("roleBinding.ObjectMeta.Labels: ", roleBinding.ObjectMeta.Labels, "value, : ", value)  
+						require.Equal(t, value, roleBinding.ObjectMeta.Labels[key])
+					}
+fmt.Println("!!!: roleBinding", roleBinding)
 
 					// Check that RoleBindings are created with unique names
 					_, rbWithNameExists := roleBindingNames[roleBinding.Name]
@@ -209,6 +240,7 @@ func TestRBACForClusterServiceVersion(t *testing.T) {
 				for _, clusterRoleBinding := range result[serviceAccount].ClusterRoleBindings {
 					require.Len(t, clusterRoleBinding.Subjects, 1)
 					require.Equal(t, serviceAccount, clusterRoleBinding.Subjects[0].Name)
+fmt.Println("!!!: clusterRoleBinding", clusterRoleBinding)
 
 					// Check that ClusterRoleBindings are created with unique names
 					_, crbWithNameExists := clusterRoleBindingNames[clusterRoleBinding.Name]
@@ -221,6 +253,7 @@ func TestRBACForClusterServiceVersion(t *testing.T) {
 					_, roleWithNameExists := rolesNames[role.Name]
 					require.False(t, roleWithNameExists, "Role with the same name already generated")
 					rolesNames[role.Name] = true
+fmt.Println("!!!: role", role)
 				}
 
 				// Check that ClusterRoles are created with unique names
@@ -228,6 +261,7 @@ func TestRBACForClusterServiceVersion(t *testing.T) {
 					_, crWithNameExists := clusterRolesNames[clusterRole.Name]
 					require.False(t, crWithNameExists, "ClusterRole with the same name already generated")
 					clusterRolesNames[clusterRole.Name] = true
+fmt.Println("!!!: clusterRole", clusterRole)
 				}
 			}
 		})
