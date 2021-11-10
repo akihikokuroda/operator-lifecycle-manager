@@ -1,12 +1,12 @@
 package resolver
 
 import (
+	"fmt"
 	"math/rand"
 	"reflect"
 	"strings"
 	"testing"
 	"testing/quick"
-	"fmt"
 
 	"github.com/stretchr/testify/require"
 
@@ -192,27 +192,14 @@ func TestRBACForClusterServiceVersion(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := RBACForClusterServiceVersion(&tt.csv)
 			require.NoError(t, err)
-for sa, pm := range result {
-     fmt.Println("!!! Service Account: ", sa)
-     for _, pme := range pm.Roles {
-          fmt.Println("!!! Roles: ", "Name: ", pme.ObjectMeta.Name, " Labels: ",  pme.ObjectMeta.Labels)
-     }
-     for _, pme := range pm.RoleBindings {
-          fmt.Println("!!! RoleBindings: " , "Name: ", pme.ObjectMeta.Name, " Labels: ",  pme.ObjectMeta.Labels)
-     }
-     for _, pme := range pm.ClusterRoles {
-          fmt.Println("!!! ClusterRoles: " , "Name: ", pme.ObjectMeta.Name, " Labels: ",  pme.ObjectMeta.Labels)
-     }
-     for _, pme := range pm.ClusterRoleBindings {
-          fmt.Println("!!! ClusterRoleBindings: " , "Name: ", pme.ObjectMeta.Name, " Labels: ",  pme.ObjectMeta.Labels)
-     }
-}
+
 			roleBindingNames := map[string]bool{}
 			rolesNames := map[string]bool{}
 			for serviceAccount, permissions := range tt.want {
 				// Check that correct number of bindings is created
 				require.Equal(t, len(permissions.RoleBindings), len(result[serviceAccount].RoleBindings))
 				require.Equal(t, len(permissions.ClusterRoleBindings), len(result[serviceAccount].ClusterRoleBindings))
+
 				// Check that testing ServiceAccount is the Subject of RoleBindings
 				for _, roleBinding := range result[serviceAccount].RoleBindings {
 					require.Len(t, roleBinding.Subjects, 1)
@@ -253,7 +240,6 @@ for sa, pm := range result {
 			for _, permission := range tt.csv.Spec.InstallStrategy.StrategySpec.Permissions {
 				name := generateName(fmt.Sprintf("%s-%s", tt.csv.GetName(), permission.ServiceAccountName), []interface{}{tt.csv.GetName(), permission,})
 				labels := permission.Label
-				fmt.Println("name: ", name, " labels: ", labels)
 				for _, role := range result[permission.ServiceAccountName].Roles {
 					if role.ObjectMeta.Name == name {
 						if labels != nil {
@@ -280,7 +266,6 @@ for sa, pm := range result {
 			for _, permission := range tt.csv.Spec.InstallStrategy.StrategySpec.ClusterPermissions {
 				name := generateName(tt.csv.GetName(), []interface{}{tt.csv.GetName(), tt.csv.GetNamespace(), permission,})
 				labels := permission.Label
-				fmt.Println("name: ", name, " labels: ", labels)
 				for _, role := range result[permission.ServiceAccountName].ClusterRoles {
 					if role.ObjectMeta.Name == name {
 						if labels != nil {
