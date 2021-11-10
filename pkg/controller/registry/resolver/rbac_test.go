@@ -92,7 +92,7 @@ func TestRBACForClusterServiceVersion(t *testing.T) {
 		name string
 		csv  v1alpha1.ClusterServiceVersion
 		want map[string]*OperatorPermissions
-		label map[string]map[string]string
+		label map[string][]map[string]string
 	}{
 		{
 			name: "RoleBindings and one ClusterRoleBinding",
@@ -109,7 +109,6 @@ func TestRBACForClusterServiceVersion(t *testing.T) {
 								{
 									ServiceAccountName: serviceAccount1,
 									Rules:              rules,
-									Label:              k8slabels.Set {"LABEL": "VALUE","LABEL1": "VALUE1",},
 								},
 								{
 									ServiceAccountName: serviceAccount1,
@@ -120,7 +119,7 @@ func TestRBACForClusterServiceVersion(t *testing.T) {
 											Resources: []string{"deployments"},
 										},
 									},
-									Label:              k8slabels.Set {"LABEL": "VALUE","LABEL1": "VALUE1",},
+									Label:              map[string]string {"LABEL": "VALUE","LABEL1": "VALUE1",},
 								},
 								{
 									ServiceAccountName: serviceAccount2,
@@ -131,7 +130,7 @@ func TestRBACForClusterServiceVersion(t *testing.T) {
 								{
 									ServiceAccountName: serviceAccount1,
 									Rules:              rules,
-									Label:              k8slabels.Set {"LABEL": "VALUE","LABEL1": "VALUE1",},
+									Label:              map[string]string {"LABEL": "VALUE","LABEL1": "VALUE1",},
 								},
 							},
 						},
@@ -145,13 +144,6 @@ func TestRBACForClusterServiceVersion(t *testing.T) {
 				},
 				serviceAccount2: {
 					RoleBindings: []*rbacv1.RoleBinding{{}},
-				},
-			},
-			label: map[string]map[string]string{
-				serviceAccount1: {
-					"LABEL": "VALUE","LABEL1": "VALUE1",
-				},
-				serviceAccount2: {
 				},
 			},
 		},
@@ -170,7 +162,7 @@ func TestRBACForClusterServiceVersion(t *testing.T) {
 								{
 									ServiceAccountName: serviceAccount1,
 									Rules:              rules,
-									Label:             k8slabels.Set {"LABEL": "VALUE","LABEL1": "VALUE1",},
+									Label:              map[string]string {"LABEL": "VALUE","LABEL1": "VALUE1",},
 								},
 								{
 									ServiceAccountName: serviceAccount2,
@@ -189,13 +181,6 @@ func TestRBACForClusterServiceVersion(t *testing.T) {
 					ClusterRoleBindings: []*rbacv1.ClusterRoleBinding{{}},
 				},
 			},
-			label: map[string]map[string]string{
-				serviceAccount1: {
-					"LABEL": "VALUE","LABEL1": "VALUE1",
-				},
-				serviceAccount2: {
-				},
-			},
 		},
 	}
 
@@ -208,7 +193,19 @@ func TestRBACForClusterServiceVersion(t *testing.T) {
 			result, err := RBACForClusterServiceVersion(&tt.csv)
 			require.NoError(t, err)
 for sa, pm := range result {
-     fmt.Println("!!!", sa, ", ", pm)
+     fmt.Println("!!! Service Account: ", sa)
+     for _, pme := range pm.Roles {
+          fmt.Println("!!! Roles: ", "Name: ", pme.ObjectMeta.Name, " Labels: ",  pme.ObjectMeta.Labels)
+     }
+     for _, pme := range pm.RoleBindings {
+          fmt.Println("!!! RoleBindings: " , "Name: ", pme.ObjectMeta.Name, " Labels: ",  pme.ObjectMeta.Labels)
+     }
+     for _, pme := range pm.ClusterRoles {
+          fmt.Println("!!! ClusterRoles: " , "Name: ", pme.ObjectMeta.Name, " Labels: ",  pme.ObjectMeta.Labels)
+     }
+     for _, pme := range pm.ClusterRoleBindings {
+          fmt.Println("!!! ClusterRoleBindings: " , "Name: ", pme.ObjectMeta.Name, " Labels: ",  pme.ObjectMeta.Labels)
+     }
 }
 			roleBindingNames := map[string]bool{}
 			rolesNames := map[string]bool{}
@@ -216,19 +213,10 @@ for sa, pm := range result {
 				// Check that correct number of bindings is created
 				require.Equal(t, len(permissions.RoleBindings), len(result[serviceAccount].RoleBindings))
 				require.Equal(t, len(permissions.ClusterRoleBindings), len(result[serviceAccount].ClusterRoleBindings))
-				labels := tt.label[serviceAccount]
-				fmt.Println("ServiceAccount: ", serviceAccount, ", labels: ", labels) 
-
 				// Check that testing ServiceAccount is the Subject of RoleBindings
 				for _, roleBinding := range result[serviceAccount].RoleBindings {
-				fmt.Println("roleBinding: ",roleBinding) 
 					require.Len(t, roleBinding.Subjects, 1)
 					require.Equal(t, serviceAccount, roleBinding.Subjects[0].Name)
-					for key, value := range labels {
-					fmt.Println("roleBinding.ObjectMeta.Labels: ", roleBinding.ObjectMeta.Labels, "value, : ", value)  
-						require.Equal(t, value, roleBinding.ObjectMeta.Labels[key])
-					}
-fmt.Println("!!!: roleBinding", roleBinding)
 
 					// Check that RoleBindings are created with unique names
 					_, rbWithNameExists := roleBindingNames[roleBinding.Name]
@@ -240,7 +228,6 @@ fmt.Println("!!!: roleBinding", roleBinding)
 				for _, clusterRoleBinding := range result[serviceAccount].ClusterRoleBindings {
 					require.Len(t, clusterRoleBinding.Subjects, 1)
 					require.Equal(t, serviceAccount, clusterRoleBinding.Subjects[0].Name)
-fmt.Println("!!!: clusterRoleBinding", clusterRoleBinding)
 
 					// Check that ClusterRoleBindings are created with unique names
 					_, crbWithNameExists := clusterRoleBindingNames[clusterRoleBinding.Name]
@@ -253,7 +240,6 @@ fmt.Println("!!!: clusterRoleBinding", clusterRoleBinding)
 					_, roleWithNameExists := rolesNames[role.Name]
 					require.False(t, roleWithNameExists, "Role with the same name already generated")
 					rolesNames[role.Name] = true
-fmt.Println("!!!: role", role)
 				}
 
 				// Check that ClusterRoles are created with unique names
@@ -261,9 +247,63 @@ fmt.Println("!!!: role", role)
 					_, crWithNameExists := clusterRolesNames[clusterRole.Name]
 					require.False(t, crWithNameExists, "ClusterRole with the same name already generated")
 					clusterRolesNames[clusterRole.Name] = true
-fmt.Println("!!!: clusterRole", clusterRole)
 				}
 			}
+			// Check custom labels 
+			for _, permission := range tt.csv.Spec.InstallStrategy.StrategySpec.Permissions {
+				name := generateName(fmt.Sprintf("%s-%s", tt.csv.GetName(), permission.ServiceAccountName), []interface{}{tt.csv.GetName(), permission,})
+				labels := permission.Label
+				fmt.Println("name: ", name, " labels: ", labels)
+				for _, role := range result[permission.ServiceAccountName].Roles {
+					if role.ObjectMeta.Name == name {
+						if labels != nil {
+							var returnedlabels k8slabels.Set  = role.ObjectMeta.Labels
+							labels["olm.owner"] = "test-csv.v1.1.0"
+							labels["olm.owner.kind"] = "ClusterServiceVersion"
+							labels["olm.owner.namespace"] = tt.csv.ObjectMeta.Namespace
+							require.Equal(t, labels, returnedlabels)
+						}
+					}
+				}
+				for _, roleBinding := range result[permission.ServiceAccountName].RoleBindings {
+					if roleBinding.ObjectMeta.Name == name {
+						if labels != nil {
+							var returnedlabels k8slabels.Set  = roleBinding.ObjectMeta.Labels
+							labels["olm.owner"] = "test-csv.v1.1.0"
+							labels["olm.owner.kind"] = "ClusterServiceVersion"
+							labels["olm.owner.namespace"] = tt.csv.ObjectMeta.Namespace
+							require.Equal(t, labels, returnedlabels)
+						}
+					}
+				}
+			}				
+			for _, permission := range tt.csv.Spec.InstallStrategy.StrategySpec.ClusterPermissions {
+				name := generateName(tt.csv.GetName(), []interface{}{tt.csv.GetName(), tt.csv.GetNamespace(), permission,})
+				labels := permission.Label
+				fmt.Println("name: ", name, " labels: ", labels)
+				for _, role := range result[permission.ServiceAccountName].ClusterRoles {
+					if role.ObjectMeta.Name == name {
+						if labels != nil {
+							var returnedlabels k8slabels.Set  = role.ObjectMeta.Labels
+							labels["olm.owner"] = "test-csv.v1.1.0"
+							labels["olm.owner.kind"] = "ClusterServiceVersion"
+							labels["olm.owner.namespace"] = tt.csv.ObjectMeta.Namespace
+							require.Equal(t, labels, returnedlabels)
+						}
+					}
+				}
+				for _, roleBinding := range result[permission.ServiceAccountName].ClusterRoleBindings {
+					if roleBinding.ObjectMeta.Name == name {
+						if labels != nil {
+							var returnedlabels k8slabels.Set  = roleBinding.ObjectMeta.Labels
+							labels["olm.owner"] = "test-csv.v1.1.0"
+							labels["olm.owner.kind"] = "ClusterServiceVersion"
+							labels["olm.owner.namespace"] = tt.csv.ObjectMeta.Namespace
+							require.Equal(t, labels, returnedlabels)
+						}
+					}
+				}
+			}				
 		})
 	}
 }
