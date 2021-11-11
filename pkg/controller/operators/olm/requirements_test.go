@@ -948,7 +948,7 @@ func TestMinKubeVersionStatus(t *testing.T) {
 		namespace,
 		"0.0.0",
 		"",
-		v1alpha1.NamedInstallStrategy{"deployment", v1alpha1.StrategyDetailsDeployment{}},
+		v1alpha1.NamedInstallStrategy{"deployment", v1alpha1.StrategyDetailsDeployment{}, nil},
 		nil,
 		nil,
 		v1alpha1.CSVPhasePending,

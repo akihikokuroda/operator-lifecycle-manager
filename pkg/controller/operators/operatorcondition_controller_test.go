@@ -69,6 +69,7 @@ var _ = Describe("OperatorCondition", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      namespacedName.Name,
 						Namespace: namespacedName.Namespace,
+						Labels:    map[string]string{"LABEL1":"VALUE1", "LABEL2":"VALUE2"},
 					},
 					Spec: operatorsv2.OperatorConditionSpec{
 						ServiceAccounts: []string{"serviceaccount"},
@@ -98,6 +99,8 @@ var _ = Describe("OperatorCondition", func() {
 					Controller:         &trueBool,
 					BlockOwnerDeletion: &falseBool,
 				}))
+				Expect(role.ObjectMeta.Labels["LABEL1"]).Should(Equal("VALUE1"))
+				Expect(role.ObjectMeta.Labels["LABEL2"]).Should(Equal("VALUE2"))
 				Expect(role.Rules).Should(Equal([]rbacv1.PolicyRule{
 					{
 						Verbs:         []string{"get", "update", "patch"},
@@ -122,6 +125,8 @@ var _ = Describe("OperatorCondition", func() {
 					return k8sClient.Get(ctx, namespacedName, roleBinding)
 				}, timeout, interval).Should(BeNil())
 				Expect(len(roleBinding.OwnerReferences)).To(Equal(1))
+				Expect(roleBinding.ObjectMeta.Labels["LABEL1"]).Should(Equal("VALUE1"))
+				Expect(roleBinding.ObjectMeta.Labels["LABEL2"]).Should(Equal("VALUE2"))
 				Expect(roleBinding.OwnerReferences).Should(ContainElement(metav1.OwnerReference{
 					APIVersion:         "operators.coreos.com/v2",
 					Kind:               "OperatorCondition",
