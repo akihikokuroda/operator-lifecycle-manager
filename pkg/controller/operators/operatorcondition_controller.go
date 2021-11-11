@@ -135,6 +135,8 @@ func (r *OperatorConditionReconciler) ensureOperatorConditionRole(operatorCondit
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      operatorCondition.GetName(),
 			Namespace: operatorCondition.GetNamespace(),
+			Labels:    operatorCondition.ObjectMeta.Labels,
+
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
@@ -183,6 +185,7 @@ func (r *OperatorConditionReconciler) ensureOperatorConditionRoleBinding(operato
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      operatorCondition.GetName(),
 			Namespace: operatorCondition.GetNamespace(),
+			Labels:    operatorCondition.ObjectMeta.Labels,
 		},
 		Subjects: subjects,
 		RoleRef: rbacv1.RoleRef{

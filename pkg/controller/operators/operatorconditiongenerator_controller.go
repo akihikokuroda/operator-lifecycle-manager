@@ -103,6 +103,7 @@ func (r *OperatorConditionGeneratorReconciler) Reconcile(ctx context.Context, re
 			// For now, only generate an OperatorCondition with the same name as the csv.
 			Name:      in.GetName(),
 			Namespace: in.GetNamespace(),
+			Labels:    in.Spec.InstallStrategy.Label,
 		},
 		Spec: operatorsv2.OperatorConditionSpec{
 			ServiceAccounts: getServiceAccountNames(*in),
